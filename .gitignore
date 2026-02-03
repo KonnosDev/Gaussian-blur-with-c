@@ -1,0 +1,16 @@
+gaussian_blur
+*.exe
+*.out
+*.o
+
+back_up/
+
+__pycache__/
+*.pyc
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+*.log
+
