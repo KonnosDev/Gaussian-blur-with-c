@@ -10,41 +10,52 @@
 
 #define PI 3.14159265358979323846
 
-// Gaussian function 
-double gaussian(int x, int y, double sigma) {
-    return (1.0 / (2.0 * PI * sigma * sigma)) *
-           exp(-(x*x + y*y) / (2.0 * sigma * sigma));
+double gaussian_1d(int x, double sigma) {
+    return exp(-(x * x) / (2.0 * sigma * sigma));
 }
 
-// Create Gaussian kernel 
 double* create_kernel(int size, double sigma) {
     int half = size / 2;
     double sum = 0.0;
-    double* kernel = malloc(size * size * sizeof(double));
+    double* kernel = malloc(size * sizeof(double));
 
-    for (int y = -half; y <= half; y++)
-    {
-        for (int x = -half; x <= half; x++)
-        {
-            double value = gaussian(x, y, sigma);
-            kernel[(y + half) * size + (x + half)] = value;
-            sum += value;
-        }
+    for (int x = -half; x <= half; x++) {
+        double value = gaussian_1d(x, sigma);
+        kernel[x + half] = value;
+        sum += value;
     }
 
-    // Normalize kernel 
-    for (int i = 0; i < size * size; i++)
+    for (int i = 0; i < size; i++)
         kernel[i] /= sum;
 
     return kernel;
 }
 
-// Apply Gaussian blur 
 void gaussian_blur(unsigned char* input, unsigned char* output,
                    int width, int height, int channels,
                    double* kernel, int ksize)
 {
     int half = ksize / 2;
+    double* temp = malloc(width * height * channels * sizeof(double));
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            for (int c = 0; c < channels; c++) {
+                double sum = 0.0;
+
+                for (int kx = -half; kx <= half; kx++) {
+                    int px = x + kx;
+                    if (px < 0) px = 0;
+                    if (px >= width) px = width - 1;
+
+                    int img_idx = (y * width + px) * channels + c;
+                    sum += input[img_idx] * kernel[kx + half];
+                }
+
+                temp[(y * width + x) * channels + c] = sum;
+            }
+        }
+    }
 
     for (int y = 0; y < height; y++) {
         for (int x = 0; x < width; x++) {
@@ -52,27 +63,23 @@ void gaussian_blur(unsigned char* input, unsigned char* output,
                 double sum = 0.0;
 
                 for (int ky = -half; ky <= half; ky++) {
-                    for (int kx = -half; kx <= half; kx++) {
-                        int px = x + kx;
-                        int py = y + ky;
+                    int py = y + ky;
+                    if (py < 0) py = 0;
+                    if (py >= height) py = height - 1;
 
-                        if (px >= 0 && px < width && py >= 0 && py < height)
-                        {
-                            int img_idx = (py * width + px) * channels + c;
-                            int ker_idx = (ky + half) * ksize + (kx + half);
-                            sum += input[img_idx] * kernel[ker_idx];
-                        }
-                    }
+                    int tmp_idx = (py * width + x) * channels + c;
+                    sum += temp[tmp_idx] * kernel[ky + half];
                 }
 
-                output[(y * width + x) * channels + c] = (unsigned char)sum;
+                output[(y * width + x) * channels + c] = (unsigned char)(sum + 0.5);
             }
         }
     }
+
+    free(temp);
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
     if (argc < 5) {
         printf("Usage: %s input.png output.png kernel_size sigma\n", argv[0]);
         return 1;
@@ -86,18 +93,17 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    int kernel_size = atoi(argv[3]);   // IMPORTANT: Must be odd
-    double sigma = atof(argv[4]);       // weight option
+    int kernel_size = atoi(argv[3]);
+    double sigma = atof(argv[4]);
 
-    //Kernel and Sigma checks
     if (kernel_size <= 0 || kernel_size % 2 == 0) {
-    printf("Error: kernel size must be a positive odd number.\n");
-    return 1;
+        printf("Error: kernel size must be a positive odd number.\n");
+        return 1;
     }
 
     if (sigma <= 0.0) {
-    printf("Error: sigma must be > 0.\n");
-    return 1;
+        printf("Error: sigma must be > 0.\n");
+        return 1;
     }
 
     unsigned char* output = malloc(width * height * channels);
@@ -114,4 +120,3 @@ int main(int argc, char** argv)
     printf("Gaussian blur applied successfully.\n");
     return 0;
 }
-
